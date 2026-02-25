@@ -32,30 +32,10 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const addressSchema = new mongoose_1.Schema({
-    fullName: { type: String, required: true },
-    street: { type: String, required: true },
-    apartment: String,
-    city: { type: String, required: true },
-    state: { type: String, required: true },
-    zipCode: { type: String, required: true },
-    country: { type: String, required: true, default: "United States" },
-    phone: { type: String, required: true },
-    isDefault: { type: Boolean, default: false },
-    type: { type: String, enum: ["home", "work", "other"], default: "home" },
-});
-const refreshTokenSchema = new mongoose_1.Schema({
-    token: { type: String, required: true },
-    expiresAt: { type: Date, required: true },
-    deviceInfo: String,
-});
+const password_utils_1 = require("../utils/password.utils");
 const userSchema = new mongoose_1.Schema({
     email: {
         type: String,
@@ -82,59 +62,76 @@ const userSchema = new mongoose_1.Schema({
         default: "customer",
     },
     avatar: String,
-    phone: String,
-    dateOfBirth: Date,
-    gender: {
-        type: String,
-        enum: ["male", "female", "other", "prefer-not-to-say"],
-    },
-    shippingAddresses: [addressSchema],
-    billingAddresses: [addressSchema],
-    wishlist: [{ type: String }],
     isEmailVerified: {
         type: Boolean,
         default: false,
     },
+    cart: [
+        {
+            bookId: { type: String, required: true },
+            title: { type: String, required: true },
+            price: { type: Number, required: true },
+            quantity: { type: Number, required: true, min: 1 },
+            coverImage: String,
+            addedAt: { type: Date, default: Date.now },
+        },
+    ],
+    wishlist: [
+        {
+            bookId: { type: String, required: true },
+            title: String,
+            addedAt: { type: Date, default: Date.now },
+        },
+    ],
+    addresses: [
+        {
+            fullName: { type: String, required: true },
+            street: { type: String, required: true },
+            apartment: String,
+            city: { type: String, required: true },
+            state: { type: String, required: true },
+            zipCode: { type: String, required: true },
+            country: { type: String, required: true, default: "United States" },
+            phone: { type: String, required: true },
+            isDefault: { type: Boolean, default: false },
+        },
+    ],
     emailVerificationToken: String,
     emailVerificationExpires: Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
-    twoFactorEnabled: {
-        type: Boolean,
-        default: false,
-    },
-    twoFactorSecret: String,
-    lastLogin: Date,
+    refreshTokens: [
+        {
+            token: String,
+            expiresAt: Date,
+        },
+    ],
     loginAttempts: {
         type: Number,
         default: 0,
     },
     lockUntil: Date,
-    refreshTokens: [refreshTokenSchema],
+    lastLogin: Date,
 }, {
     timestamps: true,
 });
-// Indexes for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ "refreshTokens.token": 1 });
-userSchema.index({ passwordResetToken: 1 });
-userSchema.index({ emailVerificationToken: 1 });
 // Hash password before saving
-userSchema.pre("save", async function (next) {
-    if (!this.isModified("password"))
-        return next();
+userSchema.pre("save", async function () {
     try {
-        const salt = await bcryptjs_1.default.genSalt(10);
-        this.password = await bcryptjs_1.default.hash(this.password, salt);
-        next();
+        // Only hash if password is modified
+        if (!this.isModified("password")) {
+            return;
+        }
+        const hashedPassword = await (0, password_utils_1.hashPassword)(this.password);
+        this.password = hashedPassword;
     }
     catch (error) {
-        next(error);
+        throw error;
     }
 });
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
-    return bcryptjs_1.default.compare(candidatePassword, this.password);
+    return (0, password_utils_1.comparePassword)(candidatePassword, this.password);
 };
 // Check if account is locked
 userSchema.methods.isLocked = function () {
@@ -146,21 +143,27 @@ userSchema.methods.incrementLoginAttempts = async function () {
     if (this.lockUntil && this.lockUntil < new Date()) {
         this.loginAttempts = 1;
         this.lockUntil = undefined;
-        return this.save();
+        await this.save(); // No arguments needed
+        return;
     }
-    // Increment attempts
     this.loginAttempts += 1;
     // Lock account after 5 failed attempts
     if (this.loginAttempts >= 5 && !this.isLocked()) {
         const lockTime = 30 * 60 * 1000; // 30 minutes
         this.lockUntil = new Date(Date.now() + lockTime);
     }
-    await this.save();
+    await this.save(); // No arguments needed
 };
 // Reset login attempts
 userSchema.methods.resetLoginAttempts = async function () {
     this.loginAttempts = 0;
     this.lockUntil = undefined;
-    await this.save();
+    await this.save(); // No arguments needed
+};
+userSchema.methods.getAddressById = function (addressId) {
+    return this.addresses.find((addr) => addr._id && addr._id.toString() === addressId);
+};
+userSchema.methods.getAddressIndex = function (addressId) {
+    return this.addresses.findIndex((addr) => addr._id && addr._id.toString() === addressId);
 };
 exports.User = mongoose_1.default.model("User", userSchema);

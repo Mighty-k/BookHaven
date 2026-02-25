@@ -6,30 +6,32 @@ const user_model_1 = require("../models/user.model");
 const authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ message: 'Authentication required' });
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ message: "Authentication required" });
         }
-        const token = authHeader.split(' ')[1];
+        const token = authHeader.split(" ")[1];
         const payload = (0, jwt_utils_1.verifyAccessToken)(token);
-        const user = await user_model_1.User.findById(payload.userId).select('-password -refreshTokens');
+        const user = await user_model_1.User.findById(payload.userId).select("-password -refreshTokens -emailVerificationToken -emailVerificationExpires -passwordResetToken -passwordResetExpires");
         if (!user) {
-            return res.status(401).json({ message: 'User not found' });
+            return res.status(401).json({ message: "User not found" });
         }
         req.user = user;
+        req.user.id = user._id;
         next();
     }
     catch (error) {
-        return res.status(401).json({ message: 'Invalid or expired token' });
+        return res.status(401).json({ message: "Invalid or expired token" });
     }
 };
 exports.authenticate = authenticate;
 const authorize = (...roles) => {
     return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({ message: 'Authentication required' });
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ message: "Authentication required" });
         }
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Insufficient permissions' });
+        if (!roles.includes(user.role)) {
+            return res.status(403).json({ message: "Insufficient permissions" });
         }
         next();
     };
@@ -38,19 +40,19 @@ exports.authorize = authorize;
 const optionalAuth = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return next();
         }
-        const token = authHeader.split(' ')[1];
+        const token = authHeader.split(" ")[1];
         const payload = (0, jwt_utils_1.verifyAccessToken)(token);
-        const user = await user_model_1.User.findById(payload.userId).select('-password -refreshTokens');
+        const user = await user_model_1.User.findById(payload.userId).select("-password -refreshTokens");
         if (user) {
             req.user = user;
+            req.user.id = user._id;
         }
         next();
     }
     catch (error) {
-        // Just continue without user
         next();
     }
 };

@@ -12,24 +12,24 @@ const connectDB = async () => {
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
         // Log available collections (for debugging)
         const collections = await conn.connection.db?.listCollections().toArray();
-        console.log('📚 Available collections:', collections?.map(c => c.name));
+        console.log("📚 Available collections:", collections?.map((c) => c.name));
     }
     catch (error) {
-        console.error('❌ MongoDB Connection Error:', error);
+        console.error("❌ MongoDB Connection Error:", error);
         process.exit(1);
     }
 };
 exports.connectDB = connectDB;
 // Handle connection events
-mongoose_1.default.connection.on('disconnected', () => {
-    console.log('🔌 MongoDB Disconnected');
+mongoose_1.default.connection.on("disconnected", () => {
+    console.log("🔌 MongoDB Disconnected");
 });
-mongoose_1.default.connection.on('error', (err) => {
-    console.error('🔴 MongoDB Error:', err);
+mongoose_1.default.connection.on("error", (err) => {
+    console.error("🔴 MongoDB Error:", err);
 });
 // Graceful shutdown
-process.on('SIGINT', async () => {
+process.on("SIGINT", async () => {
     await mongoose_1.default.connection.close();
-    console.log('👋 MongoDB connection closed through app termination');
+    console.log("👋 MongoDB connection closed through app termination");
     process.exit(0);
 });

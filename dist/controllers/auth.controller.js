@@ -18,7 +18,7 @@ class AuthController {
             });
             res.status(201).json({
                 success: true,
-                message: "Registration successful. Please verify your email.",
+                message: "Registration successful. Please check your email to verify your account.",
                 data: {
                     user: {
                         id: user._id,
@@ -69,7 +69,7 @@ class AuthController {
             if (!refreshToken) {
                 return res.status(400).json({ message: "Refresh token required" });
             }
-            const tokens = await auth_service_1.authService.refreshToken({ refreshToken });
+            const tokens = await auth_service_1.authService.refreshToken(refreshToken);
             res.json({
                 success: true,
                 data: tokens,
@@ -82,7 +82,7 @@ class AuthController {
     async logout(req, res, next) {
         try {
             const { refreshToken } = req.body;
-            const userId = req.user?._id;
+            const userId = req.user?.id;
             if (userId && refreshToken) {
                 await auth_service_1.authService.logout(userId, refreshToken);
             }
@@ -97,7 +97,7 @@ class AuthController {
     }
     async logoutAll(req, res, next) {
         try {
-            const userId = req.user?._id;
+            const userId = req.user?.id;
             if (userId) {
                 await auth_service_1.authService.logoutAll(userId);
             }
@@ -112,9 +112,9 @@ class AuthController {
     }
     async verifyEmail(req, res, next) {
         try {
-            const { token } = req.params;
-            const tokenStr = Array.isArray(token) ? token[0] : token;
-            await auth_service_1.authService.verifyEmail(tokenStr);
+            const rawToken = req.params.token;
+            const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+            await auth_service_1.authService.verifyEmail(token);
             res.json({
                 success: true,
                 message: "Email verified successfully",
@@ -126,8 +126,12 @@ class AuthController {
     }
     async resendVerification(req, res, next) {
         try {
+            const errors = (0, express_validator_1.validationResult)(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({ errors: errors.array() });
+            }
             const { email } = req.body;
-            await auth_service_1.authService.resendVerificationEmail(email);
+            await auth_service_1.authService.resendVerification(email);
             res.json({
                 success: true,
                 message: "Verification email sent",
@@ -139,6 +143,10 @@ class AuthController {
     }
     async forgotPassword(req, res, next) {
         try {
+            const errors = (0, express_validator_1.validationResult)(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({ errors: errors.array() });
+            }
             const { email } = req.body;
             await auth_service_1.authService.forgotPassword(email);
             res.json({
@@ -152,10 +160,14 @@ class AuthController {
     }
     async resetPassword(req, res, next) {
         try {
-            const { token } = req.params;
+            const errors = (0, express_validator_1.validationResult)(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({ errors: errors.array() });
+            }
+            const rawToken = req.params.token;
+            const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
             const { password } = req.body;
-            const tokenStr = Array.isArray(token) ? token[0] : token;
-            await auth_service_1.authService.resetPassword(tokenStr, password);
+            await auth_service_1.authService.resetPassword(token, password);
             res.json({
                 success: true,
                 message: "Password reset successful",
@@ -167,7 +179,11 @@ class AuthController {
     }
     async changePassword(req, res, next) {
         try {
-            const userId = req.user?._id;
+            const errors = (0, express_validator_1.validationResult)(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({ errors: errors.array() });
+            }
+            const userId = req.user?.id;
             const { currentPassword, newPassword } = req.body;
             if (!userId) {
                 return res.status(401).json({ message: "Unauthorized" });
@@ -182,21 +198,10 @@ class AuthController {
             next(error);
         }
     }
-    async getCurrentUser(req, res, next) {
-        try {
-            const user = req.user;
-            res.json({
-                success: true,
-                data: user,
-            });
-        }
-        catch (error) {
-            next(error);
-        }
-    }
     async getProfile(req, res, next) {
         try {
-            const user = req.user;
+            const userId = req.user?.id;
+            const user = await auth_service_1.authService.getProfile(userId);
             res.json({
                 success: true,
                 data: user,
