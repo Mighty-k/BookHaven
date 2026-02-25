@@ -13,12 +13,17 @@ const app = express();
 
 // Connect to MongoDB
 connectDB();
-
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://bookhaven-mocha.vercel.app",
+  "https://www.bookhaven-mocha.vercel.app/",
+];
 // Middleware
 app.use(helmet());
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
